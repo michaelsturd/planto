@@ -1,32 +1,52 @@
-import { View, Text, StyleSheet, Pressable, TextInput, Button } from 'react-native';
-import { useState } from 'react';
+import {  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  Button,
+  Alert,
+ } from 'react-native';
+import { useState, useEffect } from 'react';
 import type { Task } from '@/types/task';
-
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomeScreen() {
-
-
-const [tasks, setTasks] = useState<Task[]>([
-  {
-    id: '1',
-    title: 'Learn React Native',
-    completed: false,
-  },
-  {
-    id: '2',
-    title: 'Build my To-Do app',
-    completed: false,
-  },
-  {
-    id: '3',
-    title: 'Practice TypeScript',
-    completed: true,
-  },
-
+  const { session } = useAuth();
+  async function logout() {
+    const { error } = await supabase.auth.signOut();
   
-]);
+    if (error) {
+      Alert.alert('Logout failed', error.message);
+    }
+  }
 
-const [newTask, setNewTask] = useState('');
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  const [newTask, setNewTask] = useState('');
+
+  useEffect(() => {
+    async function fetchTasks() {
+      if (!session) return;
+  
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('id, title, completed')
+        .eq('user_id', session.user.id);
+  
+      if (error) {
+        console.log('Error fetching tasks:', error.message);
+        return;
+      }
+  
+      setTasks(data ?? []);
+    }
+  
+    fetchTasks();
+  }, [session]);
+
+
 
 const [filter, setFilter] = useState<
   'All' | 'Active' | 'Completed'
@@ -60,61 +80,99 @@ function deleteTask(id: string){
 }
 
 
-// testing 
-const networks = ['tcp', 'protocols', 'https'];
-
-function showNetworks(){
-  networks.map((netkeys) =>{
-    console.log(netkeys)
-  })
-}
-
-// showNetworks();
-
-const odds = [10, 20, 30,40, 50];
-const result = odds.filter(
-  (n) => n > 25
-);
-
-
-const results = tasks.filter((task) => task.id == "3" );
-console.log(results);
 //=================================================================
-function addTask() {
-  // check if input field is empty 
+// function addTask() {
+//   // check if input field is empty 
 
-  //trim() => this function removes space from the beginning  and end of the text. if the user enters
-  // nothing but spaces, the function stops instead of  creating an empty array 
+//   //trim() => this function removes space from the beginning  and end of the text. if the user enters
+//   // nothing but spaces, the function stops instead of  creating an empty array 
 
+//   if (newTask.trim() === '') {
+//     return;
+//   }
+
+//   const task: Task = {
+//     id: Date.now().toString(),
+//     title: newTask.trim(),
+//     completed: false,
+//   };
+
+//   setTasks((currentTasks) => [...currentTasks, task]);
+//   setNewTask('');
+// }
+
+
+
+async function addTask() {
   if (newTask.trim() === '') {
     return;
   }
 
-  const task: Task = {
-    id: Date.now().toString(),
-    title: newTask.trim(),
-    completed: false,
-  };
+  if (!session) {
+    Alert.alert('Error', 'You must be logged in.');
+    return;
+  }
 
-  setTasks((currentTasks) => [...currentTasks, task]);
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      user_id: session.user.id,
+      title: newTask.trim(),
+      completed: false,
+    })
+    .select('id, title, completed')
+    .single();
+
+  if (error) {
+    Alert.alert('Task error', error.message);
+    return;
+  }
+
+  setTasks((currentTasks) => [...currentTasks, data]);
+
   setNewTask('');
 }
+
 //=================================================================
 
 // const timeNow = Date.now().toString();
+
+
+
+async function testConnection() {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*');
+
+  if (error) {
+    console.log('Supabase connection error:', error.message);
+    return;
+  }
+
+  console.log('Supabase connected successfully!');
+  console.log('Tasks:', data);
+}
+
+
+
   return (
     <View style={styles.container}>
-    
+
       <Text style={styles.title}>My Tasks</Text>
-
+      <Pressable
+        style={styles.logoutButton}
+        onPress={logout}
+      >
+        <Text style={styles.logoutButtonText}>Logout</Text>
+      </Pressable>
       <View style={styles.progressCard}>
-  <Text style={styles.progressTitle}>
-    Your Progress
-  </Text>
+      <Text style={styles.progressTitle}>
+        Your Progress
+      </Text>
 
-  <Text style={styles.progressText}>
-    {completedTasks} of {totalTasks} tasks completed
-  </Text>
+      <Text style={styles.progressText}>
+        {completedTasks} of {totalTasks} tasks completed
+      </Text>
 
   <View style={styles.progressBar}>
     <View
@@ -214,6 +272,8 @@ function addTask() {
       
       </View>
 ))}
+
+
 </View>
 
   );
@@ -359,4 +419,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
+  logoutButton: {
+    backgroundColor: '#DC2626',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  
+  logoutButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 });
