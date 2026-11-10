@@ -22,6 +22,27 @@ export default function HomeScreen() {
   }
 
 
+async function updateTask(id: string, completed: boolean) {
+  const { error } = await supabase
+    .from('tasks')
+    .update({ completed })
+    .eq('id', id);
+
+  if (error) {
+    Alert.alert('Update failed', error.message);
+    return;
+  }
+
+  setTasks((currentTasks) =>
+    currentTasks.map((task) =>
+      task.id === id
+        ? { ...task, completed }
+        : task
+    )
+  );
+}
+
+
   const [tasks, setTasks] = useState<Task[]>([]);
 
   const [newTask, setNewTask] = useState('');
@@ -73,10 +94,24 @@ const completedTasks = tasks.filter(
 const totalTasks = tasks.length
 
 // delete task 
-function deleteTask(id: string){
+
+async function deleteTask(id: string) {
+  // First, delete the task from Supabase
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id);
+
+  // If Supabase reports an error, stop here
+  if (error) {
+    Alert.alert('Delete failed', error.message);
+    return;
+  }
+
+  // If successful, remove the task from the screen
   setTasks((currentTasks) =>
-  currentTasks.filter((task) => task.id != id)
-);
+    currentTasks.filter((task) => task.id !== id)
+  );
 }
 
 
@@ -154,6 +189,8 @@ async function testConnection() {
 }
 
 
+// console.log(supabase.from)
+
 
   return (
     <View style={styles.container}>
@@ -229,15 +266,7 @@ async function testConnection() {
         
          <Pressable
           style={styles.taskText}
-          onPress={() => {
-            setTasks((currentTasks) =>
-              currentTasks.map((item) =>
-                item.id === task.id
-                  ? { ...item, completed: !item.completed }
-                  : item
-              )
-            );
-          }}
+          onPress={() => updateTask(task.id, !task.completed)}
         >
 
           <View style={styles.taskContent} >
@@ -277,6 +306,7 @@ async function testConnection() {
 </View>
 
   );
+
 }
 
 const styles = StyleSheet.create({
